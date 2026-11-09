@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-export default function Layout() {
+export default function Layout({ isAdmin = false }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -11,6 +11,7 @@ export default function Layout() {
           <NavLink to="/dashboard"><span>▦</span> لوحة التحكم</NavLink>
           <NavLink to="/patients"><span>♙</span> المرضى</NavLink>
           <NavLink to="/appointments"><span>▣</span> المواعيد</NavLink>
+          {isAdmin && <NavLink to="/admin/registrations"><span>✓</span> طلبات التسجيل</NavLink>}
         </nav>
         <div className="sidebar-footer"><span className="online-dot" /> متصل بقاعدة البيانات</div>
       </aside>
