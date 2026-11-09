@@ -41,7 +41,8 @@ export default function App() {
     })
     return () => { active = false }
   }, [session])
-  if (location.pathname === '/download') return <DownloadApp />
+  const isDownloadPage = location.pathname.replace(/\/$/, '') === '/download' || window.location.hash.split('?')[0].replace(/^#/, '').replace(/\/$/, '') === '/download'
+  if (isDownloadPage) return <DownloadApp />
   if (!authChecked) return <p className="center">{t('جاري التحميل...','Loading...')}</p>
   if (!session) return <Login />
   if (!membership.loaded) return <p className="center">{t('جاري تحميل بيانات الحساب...','Loading account...')}</p>
