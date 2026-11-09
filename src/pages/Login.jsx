@@ -12,14 +12,31 @@ export default function Login() {
     e.preventDefault()
     setBusy(true)
     setMessage('')
-    const action =
-      mode === 'signin'
-        ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({ email, password })
-    const { error } = await action
-    if (error) setMessage(error.message)
-    else if (mode === 'signup') setMessage('تم إنشاء الحساب. لو فعّلت تأكيد الإيميل، راجع بريدك.')
-    setBusy(false)
+    try {
+      if (mode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password })
+        if (error) throw error
+        if (data.user?.id) {
+          const { error: notifyError } = await supabase.functions.invoke('notify-registration', {
+            body: { user_id: data.user.id },
+          })
+          if (notifyError) {
+            setMessage('تم استلام طلب التسجيل، لكنه لم يُرسل إشعار البريد بعد. سيظل الطلب في انتظار موافقتك.')
+          } else {
+            setMessage('تم إرسال طلب التسجيل بنجاح. حسابك سيظل موقوفاً حتى تتم الموافقة عليه.')
+          }
+        } else {
+          setMessage('تم إنشاء طلب التسجيل. راجع بريدك لتأكيد الحساب، وبعدها انتظر الموافقة.')
+        }
+      }
+    } catch (error) {
+      setMessage(error.message || 'حدث خطأ غير متوقع.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -28,18 +45,18 @@ export default function Login() {
       <form onSubmit={handleSubmit}>
         <label>
           البريد الإلكتروني
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         </label>
         <label>
           كلمة المرور
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
         </label>
         <button type="submit" disabled={busy}>
-          {mode === 'signin' ? 'تسجيل الدخول' : 'إنشاء حساب'}
+          {busy ? 'جاري التنفيذ...' : mode === 'signin' ? 'تسجيل الدخول' : 'إرسال طلب التسجيل'}
         </button>
       </form>
-      <button className="link" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
-        {mode === 'signin' ? 'ليس لديك حساب؟ أنشئ حساباً' : 'لديك حساب؟ سجّل الدخول'}
+      <button className="link" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage('') }}>
+        {mode === 'signin' ? 'ليس لديك حساب؟ اطلب إنشاء حساب' : 'لديك حساب بالفعل؟ سجّل الدخول'}
       </button>
       {message && <p className="message">{message}</p>}
     </div>

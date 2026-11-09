@@ -13,14 +13,14 @@ export default function Appointments({ clinicId }) {
         .from('appointments')
         .select('id, starts_at, ends_at, status, patients(full_name)')
         .order('starts_at', { ascending: true }),
-      supabase.from('patients').select('id, full_name').order('full_name'),
+      supabase.from('patients').select('id, full_name').eq('clinic_id', clinicId).order('full_name'),
     ])
     if (a.error) setError(a.error.message)
     else setAppointments(a.data)
     if (!p.error) setPatients(p.data)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [clinicId])
 
   async function handleAdd(e) {
     e.preventDefault()
