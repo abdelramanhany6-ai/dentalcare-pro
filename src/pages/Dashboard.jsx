@@ -29,7 +29,10 @@ export default function Dashboard({ clinicId }) {
       if (!active) return
       const failed = [patients, today, invoices, next].find((result) => result.error)
       if (failed) setError(failed.error.message)
-      const unpaid = (invoices.data || []).reduce((sum, invoice) => {\n        const paid = (invoice.payments || []).reduce((total, payment) => total + Number(payment.amount || 0), 0)\n        return sum + Math.max(0, Number(invoice.total_amount || 0) - paid)\n      }, 0)
+      const unpaid = (invoices.data || []).reduce((sum, invoice) => {
+        const paid = (invoice.payments || []).reduce((total, payment) => total + Number(payment.amount || 0), 0)
+        return sum + Math.max(0, Number(invoice.total_amount || 0) - paid)
+      }, 0)
       setStats({ patients: patients.count || 0, today: today.count || 0, unpaid })
       setUpcoming(next.data || [])
       setLoading(false)
