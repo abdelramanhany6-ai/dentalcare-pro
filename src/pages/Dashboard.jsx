@@ -23,13 +23,13 @@ export default function Dashboard({ clinicId }) {
       const [patients, today, invoices, next] = await Promise.all([
         supabase.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
         supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId).gte('starts_at', start.toISOString()).lt('starts_at', end.toISOString()).neq('status', 'cancelled'),
-        supabase.from('invoices').select('total_amount,status').eq('clinic_id', clinicId).in('status', ['unpaid', 'partially_paid']),
+        supabase.from('invoices').select('total_amount,status,payments(amount)').eq('clinic_id', clinicId).in('status', ['unpaid', 'partially_paid']),
         supabase.from('appointments').select('id,starts_at,status,patients(full_name)').eq('clinic_id', clinicId).gte('starts_at', new Date().toISOString()).neq('status', 'cancelled').order('starts_at').limit(5),
       ])
       if (!active) return
       const failed = [patients, today, invoices, next].find((result) => result.error)
       if (failed) setError(failed.error.message)
-      const unpaid = (invoices.data || []).reduce((sum, invoice) => sum + Number(invoice.total_amount || 0), 0)
+      const unpaid = (invoices.data || []).reduce((sum, invoice) => {\n        const paid = (invoice.payments || []).reduce((total, payment) => total + Number(payment.amount || 0), 0)\n        return sum + Math.max(0, Number(invoice.total_amount || 0) - paid)\n      }, 0)
       setStats({ patients: patients.count || 0, today: today.count || 0, unpaid })
       setUpcoming(next.data || [])
       setLoading(false)
