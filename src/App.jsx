@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useLanguage } from './context/LanguageContext'
 import Login from './pages/Login'
@@ -12,10 +12,12 @@ import Patients from './pages/Patients'
 import PatientDetails from './pages/PatientDetails'
 import Appointments from './pages/Appointments'
 import Billing from './pages/Billing'
+import DownloadApp from './pages/DownloadApp'
 
 const ADMIN_EMAIL = 'abdelramanhany6@gmail.com'
 export default function App() {
   const { t } = useLanguage()
+  const location = useLocation()
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [membership, setMembership] = useState({ loaded: false, clinicId: null, registrationStatus: null })
@@ -39,6 +41,7 @@ export default function App() {
     })
     return () => { active = false }
   }, [session])
+  if (location.pathname === '/download') return <DownloadApp />
   if (!authChecked) return <p className="center">{t('جاري التحميل...','Loading...')}</p>
   if (!session) return <Login />
   if (!membership.loaded) return <p className="center">{t('جاري تحميل بيانات الحساب...','Loading account...')}</p>
