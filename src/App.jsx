@@ -15,12 +15,25 @@ import Billing from './pages/Billing'
 import DownloadApp from './pages/DownloadApp'
 
 const ADMIN_EMAIL = 'abdelramanhany6@gmail.com'
+function DeviceLimitScreen({ t, details }) {
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  async function requestAccess() {
+    setBusy(true); setMessage('')
+    const { data, error } = await supabase.functions.invoke('device-access', { body: { action: 'request_limit', requested_limit: (details?.device_limit || 2) + 1, reason: 'Request to add another clinic device' } })
+    setMessage(error || data?.error ? (data?.error || error.message) : t('تم إرسال طلب زيادة عدد الأجهزة للإدارة.','Your request for additional devices was sent to the administrator.'))
+    setBusy(false)
+  }
+  return <div className="page-stack"><section className="panel"><h1>{t('عدد الأجهزة المسموح به اكتمل','Clinic device limit reached')}</h1><p>{t('هذه العيادة تستخدم بالفعل ','This clinic is already using ')}{details?.active_devices || details?.device_limit}{t(' من الأجهزة المسموح بها. الحد الحالي: ',' of its allowed devices. Current limit: ')}{details?.device_limit}.</p><p className="muted">{t('يمكنك طلب السماح بجهاز إضافي، وسيصل الطلب إلى مسؤول النظام.','You can request one additional device; the request will be sent to the system administrator.')}</p><button onClick={requestAccess} disabled={busy || !!details?.pending_request}>{busy ? t('جارٍ الإرسال...','Sending...') : details?.pending_request ? t('يوجد طلب قيد المراجعة','A request is already pending') : t('طلب جهاز إضافي','Request another device')}</button>{message && <p className="message">{message}</p>}<button className="link" onClick={() => supabase.auth.signOut()}>{t('تسجيل الخروج','Sign out')}</button></section></div>
+}
+
 export default function App() {
   const { t } = useLanguage()
   const location = useLocation()
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [membership, setMembership] = useState({ loaded: false, clinicId: null, registrationStatus: null, suspended: false })
+  const [deviceAccess, setDeviceAccess] = useState({ loaded: false, status: null, details: null, error: '' })
   useEffect(() => {
     let mounted = true
     supabase.auth.getSession().then(({ data, error }) => { if (!mounted) return; if (error) console.error(error); setSession(data.session); setAuthChecked(true) })
@@ -43,12 +56,33 @@ export default function App() {
     })
     return () => { active = false }
   }, [session])
+  useEffect(() => {
+    let active = true
+    if (!session || !membership.loaded || !membership.clinicId || session.user.email?.toLowerCase() === ADMIN_EMAIL) {
+      setDeviceAccess({ loaded: true, status: 'not_required', details: null, error: '' })
+      return () => { active = false }
+    }
+    setDeviceAccess({ loaded: false, status: null, details: null, error: '' })
+    const deviceId = localStorage.getItem('dentalcare_device_id')
+    const ua = navigator.userAgent
+    const browser = ua.includes('Edg/') ? 'Edge' : ua.includes('Chrome/') ? 'Chrome' : ua.includes('Firefox/') ? 'Firefox' : ua.includes('Safari/') ? 'Safari' : 'Browser'
+    const deviceName = (navigator.platform || 'Device') + ' · ' + browser
+    supabase.functions.invoke('device-access', { body: { action: 'register_device', device_id: deviceId, device_name: deviceName } }).then(({ data, error }) => {
+      if (!active) return
+      if (error || data?.error) setDeviceAccess({ loaded: true, status: 'error', details: null, error: data?.error || error.message })
+      else setDeviceAccess({ loaded: true, status: data?.status || 'error', details: data, error: '' })
+    })
+    return () => { active = false }
+  }, [session, membership.loaded, membership.clinicId])
   const isDownloadPage = location.pathname.replace(/\/$/, '') === '/download' || window.location.hash.split('?')[0].replace(/^#/, '').replace(/\/$/, '') === '/download'
   if (isDownloadPage) return <DownloadApp />
   if (!authChecked) return <p className="center">{t('جاري التحميل...','Loading...')}</p>
   if (!session) return <Login />
   if (!membership.loaded) return <p className="center">{t('جاري تحميل بيانات الحساب...','Loading account...')}</p>
+  if (!deviceAccess.loaded) return <p className="center">{t('جاري التحقق من الجهاز...','Verifying this device...')}</p>
   const isAdmin = session.user.email?.toLowerCase() === ADMIN_EMAIL
+  if (deviceAccess.status === 'limit_reached' && !isAdmin) return <DeviceLimitScreen t={t} details={deviceAccess.details} />
+  if (deviceAccess.status === 'error' && !isAdmin) return <div className="page-stack"><section className="panel"><h1>{t('تعذر التحقق من الجهاز','Could not verify this device')}</h1><p>{deviceAccess.error}</p><button onClick={() => window.location.reload()}>{t('إعادة المحاولة','Retry')}</button></section></div>
   if (membership.suspended && !isAdmin) return <div className="page-stack"><section className="panel"><h1>{t('الحساب موقوف مؤقتًا','Account temporarily suspended')}</h1><p className="muted">{t('تم إيقاف صلاحية دخول هذا الحساب مؤقتًا. بيانات العيادة والمرضى محفوظة، ويمكن لمسؤول النظام إعادة تفعيل الحساب.','Access to this account has been temporarily suspended. Clinic and patient data are retained; the system administrator can reactivate the account.')}</p><button onClick={() => supabase.auth.signOut()}>{t('تسجيل الخروج','Sign out')}</button></section></div>
   if (!isAdmin && !membership.clinicId && membership.registrationStatus === 'pending') return <RegistrationPending status="pending" />
   if (!isAdmin && !membership.clinicId && membership.registrationStatus === 'rejected') return <RegistrationPending status="rejected" />
