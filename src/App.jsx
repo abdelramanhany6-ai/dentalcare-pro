@@ -58,7 +58,7 @@ export default function App() {
   }, [session])
   useEffect(() => {
     let active = true
-    if (!session || !membership.loaded || !membership.clinicId || membership.suspended || session.user.email?.toLowerCase() === ADMIN_EMAIL) {
+    if (!session || !membership.loaded || !membership.clinicId || membership.suspended) {
       setDeviceAccess({ loaded: true, status: 'not_required', details: null, error: '' })
       return () => { active = false }
     }
