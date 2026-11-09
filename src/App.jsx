@@ -26,7 +26,10 @@ export default function App() {
       setSession(data.session)
       setAuthChecked(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setMembership({ loaded: false, clinicId: null, registrationStatus: null })
+      setSession(nextSession)
+    })
     return () => { mounted = false; sub.subscription.unsubscribe() }
   }, [])
 
