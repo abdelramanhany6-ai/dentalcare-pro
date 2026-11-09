@@ -7,4 +7,13 @@ if (!url || !anonKey) {
   throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Check your .env.local file.')
 }
 
-export const supabase = createClient(url, anonKey)
+const DEVICE_ID_KEY = 'dentalcare_device_id'
+let deviceId = localStorage.getItem(DEVICE_ID_KEY)
+if (!deviceId) {
+  deviceId = crypto.randomUUID()
+  localStorage.setItem(DEVICE_ID_KEY, deviceId)
+}
+
+export const supabase = createClient(url, anonKey, {
+  global: { headers: { 'x-dental-device-id': deviceId } }
+})
