@@ -58,7 +58,7 @@ export default function App() {
   }, [session])
   useEffect(() => {
     let active = true
-    if (!session || !membership.loaded || !membership.clinicId || session.user.email?.toLowerCase() === ADMIN_EMAIL) {
+    if (!session || !membership.loaded || !membership.clinicId || membership.suspended || session.user.email?.toLowerCase() === ADMIN_EMAIL) {
       setDeviceAccess({ loaded: true, status: 'not_required', details: null, error: '' })
       return () => { active = false }
     }
@@ -73,7 +73,7 @@ export default function App() {
       else setDeviceAccess({ loaded: true, status: data?.status || 'error', details: data, error: '' })
     })
     return () => { active = false }
-  }, [session, membership.loaded, membership.clinicId])
+  }, [session, membership.loaded, membership.clinicId, membership.suspended])
   const isDownloadPage = location.pathname.replace(/\/$/, '') === '/download' || window.location.hash.split('?')[0].replace(/^#/, '').replace(/\/$/, '') === '/download'
   if (isDownloadPage) return <DownloadApp />
   if (!authChecked) return <p className="center">{t('جاري التحميل...','Loading...')}</p>
