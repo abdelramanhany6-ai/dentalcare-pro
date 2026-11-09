@@ -20,24 +20,26 @@ export default function App() {
   const location = useLocation()
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [membership, setMembership] = useState({ loaded: false, clinicId: null, registrationStatus: null })
+  const [membership, setMembership] = useState({ loaded: false, clinicId: null, registrationStatus: null, suspended: false })
   useEffect(() => {
     let mounted = true
     supabase.auth.getSession().then(({ data, error }) => { if (!mounted) return; if (error) console.error(error); setSession(data.session); setAuthChecked(true) })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => { setMembership({ loaded:false, clinicId:null, registrationStatus:null }); setSession(nextSession) })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => { setMembership({ loaded:false, clinicId:null, registrationStatus:null, suspended:false }); setSession(nextSession) })
     return () => { mounted = false; sub.subscription.unsubscribe() }
   }, [])
   useEffect(() => {
     let active = true
-    if (!session) { setMembership({ loaded:false, clinicId:null, registrationStatus:null }); return () => { active = false } }
+    if (!session) { setMembership({ loaded:false, clinicId:null, registrationStatus:null, suspended:false }); return () => { active = false } }
     Promise.all([
       supabase.from('clinic_members').select('clinic_id').eq('user_id', session.user.id).limit(1).maybeSingle(),
       supabase.from('registration_requests').select('status').eq('user_id', session.user.id).maybeSingle(),
-    ]).then(([memberResult, requestResult]) => {
+      supabase.functions.invoke('registration-admin', { body: { action: 'my_access_status' } }),
+    ]).then(([memberResult, requestResult, accessResult]) => {
       if (!active) return
       if (memberResult.error) console.error(memberResult.error)
       if (requestResult.error) console.error(requestResult.error)
-      setMembership({ loaded:true, clinicId:memberResult.data?.clinic_id ?? null, registrationStatus:requestResult.data?.status ?? null })
+      if (accessResult.error) console.error('Could not verify account access status:', accessResult.error)
+      setMembership({ loaded:true, clinicId:memberResult.data?.clinic_id ?? null, registrationStatus:requestResult.data?.status ?? null, suspended:!!accessResult.data?.suspended })
     })
     return () => { active = false }
   }, [session])
@@ -47,6 +49,7 @@ export default function App() {
   if (!session) return <Login />
   if (!membership.loaded) return <p className="center">{t('جاري تحميل بيانات الحساب...','Loading account...')}</p>
   const isAdmin = session.user.email?.toLowerCase() === ADMIN_EMAIL
+  if (membership.suspended && !isAdmin) return <div className="page-stack"><section className="panel"><h1>{t('الحساب موقوف مؤقتًا','Account temporarily suspended')}</h1><p className="muted">{t('تم إيقاف صلاحية دخول هذا الحساب مؤقتًا. بيانات العيادة والمرضى محفوظة، ويمكن لمسؤول النظام إعادة تفعيل الحساب.','Access to this account has been temporarily suspended. Clinic and patient data remain محفوظة; the system administrator can reactivate the account.')}</p><button onClick={() => supabase.auth.signOut()}>{t('تسجيل الخروج','Sign out')}</button></section></div>
   if (!isAdmin && !membership.clinicId && membership.registrationStatus === 'pending') return <RegistrationPending status="pending" />
   if (!isAdmin && !membership.clinicId && membership.registrationStatus === 'rejected') return <RegistrationPending status="rejected" />
   if (!isAdmin && !membership.clinicId && membership.registrationStatus !== 'approved') return <RegistrationPending status="missing" />
