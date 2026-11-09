@@ -1,65 +1,18 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-
-const number = (value) => new Intl.NumberFormat('ar-EG').format(value || 0)
-const money = (value) => new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(value || 0)
-
-export default function Dashboard({ clinicId }) {
-  const [stats, setStats] = useState({ patients: 0, today: 0, unpaid: 0 })
-  const [upcoming, setUpcoming] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let active = true
-    async function load() {
-      setLoading(true)
-      setError('')
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(start)
-      end.setDate(end.getDate() + 1)
-      const [patients, today, invoices, next] = await Promise.all([
-        supabase.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
-        supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId).gte('starts_at', start.toISOString()).lt('starts_at', end.toISOString()).neq('status', 'cancelled'),
-        supabase.from('invoices').select('total_amount,status,payments(amount)').eq('clinic_id', clinicId).in('status', ['unpaid', 'partially_paid']),
-        supabase.from('appointments').select('id,starts_at,status,patients(full_name)').eq('clinic_id', clinicId).gte('starts_at', new Date().toISOString()).neq('status', 'cancelled').order('starts_at').limit(5),
-      ])
-      if (!active) return
-      const failed = [patients, today, invoices, next].find((result) => result.error)
-      if (failed) setError(failed.error.message)
-      const unpaid = (invoices.data || []).reduce((sum, invoice) => {
-        const paid = (invoice.payments || []).reduce((total, payment) => total + Number(payment.amount || 0), 0)
-        return sum + Math.max(0, Number(invoice.total_amount || 0) - paid)
-      }, 0)
-      setStats({ patients: patients.count || 0, today: today.count || 0, unpaid })
-      setUpcoming(next.data || [])
-      setLoading(false)
-    }
-    load()
-    return () => { active = false }
-  }, [clinicId])
-
-  return (
-    <div className="page-stack">
-      <div className="page-heading">
-        <div><p className="eyebrow">نظرة عامة</p><h1>لوحة التحكم</h1><p className="muted">ملخص سريع لحركة العيادة اليوم.</p></div>
-        <span className="date-chip">{new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-      </div>
-      {error && <p className="message">{error}</p>}
-      <div className="stats-grid">
-        <article className="stat-card"><span className="stat-label">إجمالي المرضى</span><strong>{loading ? '—' : number(stats.patients)}</strong><span className="stat-hint">ملفات المرضى المسجلة</span></article>
-        <article className="stat-card"><span className="stat-label">مواعيد اليوم</span><strong>{loading ? '—' : number(stats.today)}</strong><span className="stat-hint">باستثناء المواعيد الملغاة</span></article>
-        <article className="stat-card"><span className="stat-label">مبالغ مستحقة</span><strong>{loading ? '—' : money(stats.unpaid)}</strong><span className="stat-hint">فواتير غير مدفوعة أو مدفوعة جزئياً</span></article>
-      </div>
-      <section className="panel">
-        <div className="section-heading"><div><h2>المواعيد القادمة</h2><p className="muted">أقرب المواعيد المسجلة في العيادة.</p></div><Link className="text-link" to="/appointments">عرض كل المواعيد</Link></div>
-        {loading ? <p className="muted">جاري تحميل المواعيد...</p> : upcoming.length === 0 ? <div className="empty-state">لا توجد مواعيد قادمة حالياً.</div> : (
-          <div className="appointment-list">{upcoming.map((item) => <div className="appointment-row" key={item.id}><div><strong>{item.patients?.full_name || 'مريض'}</strong><span className="muted">{new Date(item.starts_at).toLocaleString('ar-EG')}</span></div><span className={`status status-${item.status}`}>{item.status === 'scheduled' ? 'مجدول' : item.status === 'completed' ? 'مكتمل' : item.status}</span></div>)}</div>
-        )}
-      </section>
-      <div className="quick-links"><Link to="/patients" className="quick-link"><strong>إدارة المرضى</strong><span>إضافة مريض أو فتح ملفه الطبي ←</span></Link><Link to="/appointments" className="quick-link"><strong>تنظيم المواعيد</strong><span>مراجعة جدول الحجوزات ←</span></Link></div>
-    </div>
-  )
+import {useEffect,useState} from 'react'
+import {Link} from 'react-router-dom'
+import {supabase} from '../lib/supabase'
+import {useLanguage} from '../context/LanguageContext'
+export default function Dashboard({clinicId}) {
+ const {t,language}=useLanguage(),locale=language==='ar'?'ar-EG':'en-GB'
+ const money=v=>new Intl.NumberFormat(locale,{style:'currency',currency:'EGP',maximumFractionDigits:0}).format(v||0)
+ const number=v=>new Intl.NumberFormat(locale).format(v||0)
+ const [stats,setStats]=useState({patients:0,today:0,unpaid:0}),[upcoming,setUpcoming]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('')
+ useEffect(()=>{let active=true;async function load(){setLoading(true);setError('');const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);const [p,a,i,n]=await Promise.all([supabase.from('patients').select('id',{count:'exact',head:true}).eq('clinic_id',clinicId),supabase.from('appointments').select('id',{count:'exact',head:true}).eq('clinic_id',clinicId).gte('starts_at',start.toISOString()).lt('starts_at',end.toISOString()).neq('status','cancelled'),supabase.from('invoices').select('total_amount,payments(amount)').eq('clinic_id',clinicId).in('status',['unpaid','partially_paid']),supabase.from('appointments').select('id,starts_at,status,patients(full_name)').eq('clinic_id',clinicId).gte('starts_at',new Date().toISOString()).neq('status','cancelled').order('starts_at').limit(5)]);if(!active)return;const fail=[p,a,i,n].find(x=>x.error);if(fail)setError(fail.error.message);const unpaid=(i.data||[]).reduce((s,x)=>s+Math.max(0,Number(x.total_amount||0)-(x.payments||[]).reduce((v,pay)=>v+Number(pay.amount||0),0)),0);setStats({patients:p.count||0,today:a.count||0,unpaid});setUpcoming(n.data||[]);setLoading(false)}load();return()=>{active=false}},[clinicId])
+ const status=s=>({scheduled:t('مجدول','Scheduled'),completed:t('مكتمل','Completed'),cancelled:t('ملغي','Cancelled'),no_show:t('لم يحضر','No-show')}[s]||s)
+ return <div className="page-stack"><div className="page-heading"><div><p className="eyebrow">{t('نظرة عامة','OVERVIEW')}</p><h1>{t('لوحة التحكم','Dashboard')}</h1><p className="muted">{t('ملخص سريع لحركة العيادة اليوم.','A quick overview of your clinic today.')}</p></div><span className="date-chip">{new Date().toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long'})}</span></div>
+ {error&&<p className="message">{error}</p>}<div className="stats-grid"><article className="stat-card"><span className="stat-label">{t('إجمالي المرضى','Total patients')}</span><strong>{loading?'—':number(stats.patients)}</strong><span className="stat-hint">{t('ملفات المرضى المسجلة','Registered patient files')}</span></article><article className="stat-card"><span className="stat-label">{t('مواعيد اليوم','Today appointments')}</span><strong>{loading?'—':number(stats.today)}</strong><span className="stat-hint">{t('باستثناء المواعيد الملغاة','Excluding cancelled visits')}</span></article><article className="stat-card"><span className="stat-label">{t('مبالغ مستحقة','Outstanding balances')}</span><strong>{loading?'—':money(stats.unpaid)}</strong><span className="stat-hint">{t('فواتير غير مدفوعة أو جزئيًا','Unpaid or partially paid invoices')}</span></article></div>
+ <section className="panel"><div className="section-heading"><div><h2>{t('المواعيد القادمة','Upcoming appointments')}</h2><p className="muted">{t('أقرب المواعيد المسجلة في العيادة.','Next scheduled clinic visits.')}</p></div><Link className="text-link" to="/appointments">{t('عرض كل المواعيد','View all')}</Link></div>
+ {loading?<p className="muted">{t('جاري تحميل المواعيد...','Loading appointments...')}</p>:!upcoming.length?<div className="empty-state">{t('لا توجد مواعيد قادمة حالياً.','No upcoming appointments.')}</div>:<div className="appointment-list">{upcoming.map(x=><div className="appointment-row" key={x.id}><div><strong>{x.patients?.full_name||t('مريض','Patient')}</strong><span className="muted">{new Date(x.starts_at).toLocaleString(locale)}</span></div><span className={'status status-'+x.status}>{status(x.status)}</span></div>)}</div>}</section>
+ <div className="quick-links"><Link to="/patients" className="quick-link"><strong>{t('إدارة المرضى','Patient management')}</strong><span>{t('إضافة مريض أو فتح ملفه الطبي ←','Add a patient or open a file →')}</span></Link><Link to="/billing" className="quick-link"><strong>{t('الحسابات والمدفوعات','Billing & payments')}</strong><span>{t('الفواتير وتحصيل المستحقات ←','Invoices and collect balances →')}</span></Link><Link to="/appointments" className="quick-link"><strong>{t('تنظيم المواعيد','Appointments')}</strong><span>{t('مراجعة جدول الحجوزات ←','Review the booking schedule →')}</span></Link></div>
+ </div>
 }
