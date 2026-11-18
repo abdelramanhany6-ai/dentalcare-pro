@@ -15,8 +15,7 @@ if (!deviceId) {
 }
 
 // Send the device header only to PostgREST and Edge Functions.
-// Supabase Auth requests must not receive this custom header, otherwise
-// browser CORS preflight can prevent sign-in/sign-up from completing.
+// Do not attach it to Supabase Auth requests; that can break browser CORS preflight.
 const deviceAwareFetch = (input, init = {}) => {
   const requestUrl = typeof input === 'string'
     ? input
@@ -25,8 +24,11 @@ const deviceAwareFetch = (input, init = {}) => {
       : input.url
   const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined))
 
-  if (typeof requestUrl === 'string' && /\\/(?:rest\\/v1|functions\\/v1)(?:\\/|$)/.test(new URL(requestUrl, url).pathname)) {
-    headers.set('x-dental-device-id', deviceId)
+  if (typeof requestUrl === 'string') {
+    const path = new URL(requestUrl, url).pathname
+    if (path.startsWith('/rest/v1/') || path.startsWith('/functions/v1/')) {
+      headers.set('x-dental-device-id', deviceId)
+    }
   }
 
   return fetch(input, { ...init, headers })
