@@ -14,23 +14,28 @@ if (!deviceId) {
   localStorage.setItem(DEVICE_ID_KEY, deviceId)
 }
 
-// Send the device header only to PostgREST and Edge Functions.
-// Do not attach it to Supabase Auth requests; that can break browser CORS preflight.
+// Leave Supabase Auth and all unrelated requests completely untouched.
+// Add the clinic device header only to PostgREST and Edge Function calls.
 const deviceAwareFetch = (input, init = {}) => {
   const requestUrl = typeof input === 'string'
     ? input
     : input instanceof URL
       ? input.href
       : input.url
-  const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined))
 
-  if (typeof requestUrl === 'string') {
-    const path = new URL(requestUrl, url).pathname
-    if (path.startsWith('/rest/v1/') || path.startsWith('/functions/v1/')) {
-      headers.set('x-dental-device-id', deviceId)
-    }
+  let path
+  try {
+    path = new URL(requestUrl, url).pathname
+  } catch {
+    return fetch(input, init)
   }
 
+  if (!path.startsWith('/rest/v1/') && !path.startsWith('/functions/v1/')) {
+    return fetch(input, init)
+  }
+
+  const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined))
+  headers.set('x-dental-device-id', deviceId)
   return fetch(input, { ...init, headers })
 }
 
