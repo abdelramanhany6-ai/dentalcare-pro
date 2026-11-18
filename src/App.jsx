@@ -76,6 +76,7 @@ export default function App() {
   }, [session, membership.loaded, membership.clinicId, membership.suspended])
   const isDownloadPage = location.pathname.replace(/\/$/, '') === '/download' || window.location.hash.split('?')[0].replace(/^#/, '').replace(/\/$/, '') === '/download'
   if (isDownloadPage) return <DownloadApp />
+  if (new URLSearchParams(window.location.search).get('auth') === 'recovery') return <Login />
   if (!authChecked) return <p className="center">{t('جاري التحميل...','Loading...')}</p>
   if (!session) return <Login />
   if (!membership.loaded) return <p className="center">{t('جاري تحميل بيانات الحساب...','Loading account...')}</p>
